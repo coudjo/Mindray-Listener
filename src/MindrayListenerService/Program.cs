@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MindrayMiddleware;
@@ -10,7 +11,17 @@ var builder = Host.CreateDefaultBuilder(args)
             .Bind(hostContext.Configuration.GetSection("SerialSettings"))
             .ValidateOnStart();
 
-        services.AddSingleton<IResultProcessor, LoggingResultProcessor>();
+        var connectionString = hostContext.Configuration.GetConnectionString("IziLabs");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddDbContext<ListenerDbContext>(options => options.UseSqlServer(connectionString));
+            services.AddSingleton<IResultProcessor, DatabaseResultProcessor>();
+        }
+        else
+        {
+            services.AddSingleton<IResultProcessor, LoggingResultProcessor>();
+        }
+
         services.AddHostedService<MindrayListenerWorker>();
     });
 

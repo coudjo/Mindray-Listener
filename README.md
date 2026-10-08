@@ -2,7 +2,7 @@
 
 A .NET worker that listens on a serial port for a Mindray BC-3000Plus hematology analyzer, completes the device handshake, and parses each result into structured blocks.
 
-During development it runs as a console app (`dotnet run`). The same build installs as a Windows Service. Parsed results are handed to `IResultProcessor`. The current implementation logs them. Database persistence is a later phase and does not require changes to the worker.
+During development it runs as a console app (`dotnet run`). The same build installs as a Windows Service. Each parsed result is written to the izi-labs SQL Server database. If `ConnectionStrings:IziLabs` is empty, the worker logs the result instead.
 
 Requires the .NET 9 SDK.
 
@@ -46,7 +46,20 @@ From the repository root:
 dotnet run --project src/MindrayListenerService
 ```
 
-The log line for a parsed result includes the sample id, block count, and each parameter that has a `Val` field (value, low, high, unit).
+With a connection string configured, the worker saves the result and logs the sample id. Without one, it logs each parameter value, range, and unit.
+
+## Database
+
+The listener uses the same `IziLabs` connection string as the web app (`Server=localhost,14333` in development, from the izi-labs Docker SQL Server). It does not run migrations. The web app owns the schema.
+
+For each transmission it inserts one `TestResults` row, one `ResultParameters` row per block that has a `Val`, and one `ResultHistograms` row for each 256-byte WBC, RBC, and PLT histogram. `RawPayload` stores the message the parser saw, starting at `ENQ`.
+
+It then looks for a `TestRequests` row with that `SampleID` and status `Pending`:
+
+- A match sets `TestResults.TestRequestId` and moves the request to `Ready`.
+- No match, a blank sample id, or a request that is already `Ready` or `Printed` leaves `TestRequestId` null. Those rows show up on the web app's reconciliation page.
+
+Values above `High` are flagged `H`. Values below `Low` are flagged `L`. Values the device sends that are not numbers are stored with no flag.
 
 ## Test
 
@@ -84,6 +97,5 @@ sc start MindrayListener
 
 ## Out of scope for now
 
-- Saving results, matching them to a test request, or any other database work
-- A web app, notifications, or printing
-- Interpreting histogram bytes or the trailing footer
+- Drawing histogram charts or decoding the trailing footer
+- Notifications or printing. The web app marks a request `Printed` when the report is printed.

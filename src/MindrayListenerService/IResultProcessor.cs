@@ -3,10 +3,9 @@ using Microsoft.Extensions.Logging;
 namespace MindrayMiddleware
 {
     /// <summary>
-    /// Handles a fully parsed result. The real implementation (Phase 3) will look
-    /// up the TestRequest by SampleID and persist TestResult/ResultParameters rows;
-    /// this stub just logs, so the listener is runnable and testable before the
-    /// data layer exists.
+    /// Handles a fully parsed result. <see cref="DatabaseResultProcessor"/> writes it
+    /// to the izi-labs database. <see cref="LoggingResultProcessor"/> is used only
+    /// when no connection string is configured.
     /// </summary>
     public interface IResultProcessor
     {
@@ -44,10 +43,6 @@ namespace MindrayMiddleware
                         block.Fields.GetValueOrDefault("Unit"));
                 }
             }
-
-            // TODO Phase 3: EF Core — find TestRequest by sampleId, save TestResult +
-            // ResultParameters, mark Status = Ready. If no matching TestRequest,
-            // save with RequestId = null for manual reconciliation.
 
             return Task.CompletedTask;
         }
